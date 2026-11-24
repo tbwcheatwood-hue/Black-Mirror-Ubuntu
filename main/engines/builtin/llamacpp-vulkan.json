@@ -1,0 +1,39 @@
+{
+  "id": "llamacpp-vulkan",
+  "family": "llama.cpp",
+  "displayName": "llama.cpp (Vulkan)",
+  "api": "openai",
+  "serverBinary": "llama-server",
+  "acceleration": "gpu-vulkan",
+  "os": ["win32", "linux"],
+  "arch": ["x64", "arm64"],
+  "capabilities": {
+    "thinking": "reasoning-format",
+    "images": false,
+    "embeddings": true,
+    "logitTimingLogs": true
+  },
+  "hardware": {
+    "requirements": ["Vulkan-capable GPU or iGPU with updated driver"],
+    "notes": "Vulkan offload for NVIDIA, AMD and Intel GPUs that expose a Vulkan driver. A GPU in sysfs is not enough — vulkaninfo or the binary's --list-devices must succeed. Integrated GPUs share system RAM; partial offload is often faster than sending every layer."
+  },
+  "install": {
+    "type": "github-release-zip",
+    "repo": "ggml-org/llama.cpp",
+    "assetTemplate": "llama-{tag}-bin-win-vulkan-x64.zip",
+    "assetTemplateArm64": "llama-{tag}-bin-win-vulkan-arm64.zip",
+    "assets": {
+      "linux-x64": "llama-{tag}-bin-ubuntu-vulkan-x64.tar.gz",
+      "linux-arm64": "llama-{tag}-bin-ubuntu-vulkan-arm64.tar.gz",
+      "win32-x64": "llama-{tag}-bin-win-vulkan-x64.zip",
+      "win32-arm64": "llama-{tag}-bin-win-vulkan-arm64.zip"
+    },
+    "stableTagPointer": "https://github.com/ggml-org/llama.cpp/releases/download/v1.0.0/nightly-tag.txt",
+    "fallbackTagStrategy": "latest-b-release"
+  },
+  "versionProbe": { "type": "cli", "args": ["--version"], "regex": "version:\\s*(\\d+)\\s*\\((\\w+)\\)" },
+  "readyProbe": { "type": "http", "path": "/health", "expect": 200 },
+  "defaultPort": 8082,
+  "defaultBind": "127.0.0.1",
+  "models": "gguf-path"
+}

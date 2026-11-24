@@ -1,0 +1,37 @@
+{
+  "id": "lemonade",
+  "family": "lemonade",
+  "displayName": "Lemonade Server",
+  "api": "openai",
+  "serverBinary": "lemonade-server",
+  "acceleration": "engine-managed",
+  "os": ["win32", "linux"],
+  "arch": ["x64", "arm64"],
+  "capabilities": {
+    "thinking": "unsupported",
+    "images": false,
+    "embeddings": true,
+    "logitTimingLogs": false
+  },
+  "hardware": {
+    "requirements": ["AMD Ryzen AI (XDNA NPU) or Intel/AMD GPU for accelerated paths; CPU fallback"],
+    "notes": "Lemonade serves an OpenAI-compatible API. Ubuntu embeddable tarballs are installed into Black Mirror's data directory only. An existing system Lemonade is never upgraded or stopped unless Black Mirror started that process."
+  },
+  "install": {
+    "type": "github-release-zip",
+    "repo": "lemonade-sdk/lemonade",
+    "assetTemplate": "lemonade-embeddable-{version}-windows-x64.zip",
+    "assets": {
+      "linux-x64": "lemonade-embeddable-{version}-ubuntu-x64.tar.gz",
+      "linux-arm64": "lemonade-embeddable-{version}-ubuntu-arm64.tar.gz",
+      "win32-x64": "lemonade-embeddable-{version}-windows-x64.zip"
+    },
+    "stableTagPointer": "https://api.github.com/repos/lemonade-sdk/lemonade/releases/latest",
+    "fallbackTagStrategy": "github-api-latest"
+  },
+  "versionProbe": { "type": "cli", "args": ["-v"], "regex": "([0-9]+\\.[0-9]+\\.[0-9]+)" },
+  "readyProbe": { "type": "http", "path": "/api/v1/health", "expect": 200 },
+  "defaultPort": 8000,
+  "defaultBind": "127.0.0.1",
+  "models": "lemonade-registry"
+}

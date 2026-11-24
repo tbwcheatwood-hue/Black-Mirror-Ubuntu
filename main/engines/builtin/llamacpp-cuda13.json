@@ -1,0 +1,39 @@
+{
+  "id": "llamacpp-cuda13",
+  "family": "llama.cpp",
+  "displayName": "llama.cpp (CUDA 13)",
+  "api": "openai",
+  "serverBinary": "llama-server",
+  "acceleration": "gpu-cuda",
+  "modernCudaMinCC": 5.0,
+  "os": ["linux", "win32"],
+  "arch": ["x64", "arm64"],
+  "capabilities": {
+    "thinking": "reasoning-format",
+    "images": false,
+    "embeddings": true,
+    "logitTimingLogs": true
+  },
+  "hardware": {
+    "requirements": ["NVIDIA driver new enough for the bundled CUDA 13.5 libraries"],
+    "notes": "CUDA 13 assets require a current NVIDIA driver. They are the wrong choice for legacy Kepler boards (Tesla K80 and other cc 3.x). Black Mirror will not install a driver for you. Confirm the binary's own --list-devices output after install; do not assume every NVIDIA GPU on a multi-GPU machine can join this process."
+  },
+  "install": {
+    "type": "github-release-zip",
+    "repo": "ggml-org/llama.cpp",
+    "assetTemplate": "llama-{tag}-bin-win-cuda-13.5-x64.zip",
+    "assets": {
+      "linux-x64": "llama-{tag}-bin-ubuntu-cuda-13.5-x64.tar.gz",
+      "linux-arm64": "llama-{tag}-bin-ubuntu-cuda-13.5-arm64.tar.gz",
+      "win32-x64": "llama-{tag}-bin-win-cuda-13.5-x64.zip",
+      "win32-arm64": "llama-{tag}-bin-win-cuda-13.5-arm64.zip"
+    },
+    "stableTagPointer": "https://github.com/ggml-org/llama.cpp/releases/download/v1.0.0/nightly-tag.txt",
+    "fallbackTagStrategy": "latest-b-release"
+  },
+  "versionProbe": { "type": "cli", "args": ["--version"], "regex": "version:\\s*(\\d+)\\s*\\((\\w+)\\)" },
+  "readyProbe": { "type": "http", "path": "/health", "expect": 200 },
+  "defaultPort": 8085,
+  "defaultBind": "127.0.0.1",
+  "models": "gguf-path"
+}

@@ -1,0 +1,37 @@
+{
+  "id": "llamacpp-cuda12",
+  "family": "llama.cpp",
+  "displayName": "llama.cpp (CUDA 12)",
+  "api": "openai",
+  "serverBinary": "llama-server",
+  "acceleration": "gpu-cuda",
+  "modernCudaMinCC": 5.0,
+  "os": ["linux", "win32"],
+  "arch": ["x64"],
+  "capabilities": {
+    "thinking": "reasoning-format",
+    "images": false,
+    "embeddings": true,
+    "logitTimingLogs": true
+  },
+  "hardware": {
+    "requirements": ["NVIDIA driver that can load the CUDA 12.x runtime bundled with this build", "GPU compute capability 5.0 (Maxwell) or newer"],
+    "notes": "Official CUDA 12.8 Ubuntu/Windows assets. They do NOT support Kepler (Tesla K80, compute capability 3.7) or earlier. A newer tag is not more compatible with old GPUs. If nvidia-smi reports cc < 5.0, register an older CUDA 11-era binary via a custom executable path instead of installing this engine. Device visibility in nvidia-smi is not a successful inference test."
+  },
+  "install": {
+    "type": "github-release-zip",
+    "repo": "ggml-org/llama.cpp",
+    "assetTemplate": "llama-{tag}-bin-win-cuda-12.4-x64.zip",
+    "assets": {
+      "linux-x64": ["llama-{tag}-bin-ubuntu-cuda-12.8-x64.tar.gz", "llama-{tag}-bin-ubuntu-cuda-12.4-x64.tar.gz"],
+      "win32-x64": ["llama-{tag}-bin-win-cuda-12.4-x64.zip"]
+    },
+    "stableTagPointer": "https://github.com/ggml-org/llama.cpp/releases/download/v1.0.0/nightly-tag.txt",
+    "fallbackTagStrategy": "latest-b-release"
+  },
+  "versionProbe": { "type": "cli", "args": ["--version"], "regex": "version:\\s*(\\d+)\\s*\\((\\w+)\\)" },
+  "readyProbe": { "type": "http", "path": "/health", "expect": 200 },
+  "defaultPort": 8084,
+  "defaultBind": "127.0.0.1",
+  "models": "gguf-path"
+}

@@ -1,0 +1,71 @@
+{
+  "name": "black-mirror",
+  "productName": "Black Mirror",
+  "version": "1.2.2",
+  "description": "Local LLM studio, model library and inference server controller. Your machine. Your models. Your intelligence.",
+  "author": "Black Mirror Project",
+  "homepage": "https://github.com/kayock/Black-Mirror",
+  "license": "MIT",
+  "desktopName": "black-mirror.desktop",
+  "main": "main/main.js",
+  "scripts": {
+    "setup": "npm ci --no-audit --no-fund && npm run vendor",
+    "vendor": "node scripts/vendor-renderer-deps.js",
+    "test": "node --test tests/*.test.js",
+    "test:real": "node tests/real-inference.js",
+    "test:electron": "node tests/electron-runtime.test.js",
+    "start": "electron .",
+    "dev": "electron .",
+    "build:win": "electron-builder --win dir zip --x64",
+    "build:portable": "electron-builder --win portable --x64",
+    "build:linux": "electron-builder --linux deb AppImage tar.gz --x64",
+    "dist:verify": "node scripts/verify-dist.js"
+  },
+  "dependencies": {
+    "highlight.js": "^11.12.0",
+    "marked": "^18.3.0"
+  },
+  "devDependencies": {
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.24.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "build": {
+    "appId": "org.blackmirror.studio",
+    "productName": "Black Mirror",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main/**/*",
+      "renderer/**/*",
+      "assets/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/icon.png",
+      "target": [
+        { "target": "dir", "arch": ["x64"] },
+        { "target": "zip", "arch": ["x64"] }
+      ]
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "category": "Utility",
+      "maintainer": "Black Mirror Project",
+      "synopsis": "Local LLM studio for Ubuntu",
+      "description": "Black Mirror Ubuntu edition. Your machine. Your models. Your intelligence.",
+      "syncDesktopName": true,
+      "target": [
+        { "target": "deb", "arch": ["x64"] },
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "tar.gz", "arch": ["x64"] }
+      ]
+    }
+  }
+}
+

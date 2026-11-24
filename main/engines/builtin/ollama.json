@@ -1,0 +1,44 @@
+{
+  "id": "ollama",
+  "family": "ollama",
+  "displayName": "Ollama",
+  "api": "openai",
+  "serverBinary": "ollama",
+  "acceleration": "engine-managed",
+  "os": ["win32", "linux"],
+  "arch": ["x64", "arm64"],
+  "capabilities": {
+    "thinking": "request-flag",
+    "images": true,
+    "embeddings": true,
+    "logitTimingLogs": false
+  },
+  "hardware": {
+    "requirements": [],
+    "notes": "Ollama manages its own acceleration. On Windows, Black Mirror downloads the official installer and does not modify an existing install. On Linux it unpacks the official tarball into its own data directory and sets OLLAMA_MODELS there so a system Ollama is left alone. Only the process Black Mirror spawned can be stopped."
+  },
+  "install": {
+    "type": "download-run-installer",
+    "url": "https://ollama.com/download/OllamaSetup.exe",
+    "notes": "Windows: official installer, user interaction required. Linux: isolated GitHub tarball (no root, no install.sh).",
+    "platforms": {
+      "linux": {
+        "type": "github-release-zip",
+        "repo": "ollama/ollama",
+        "tagStyle": "semver",
+        "assetTemplate": "ollama-linux-amd64.tgz",
+        "assets": {
+          "linux-x64": "ollama-linux-amd64.tgz",
+          "linux-arm64": "ollama-linux-arm64.tgz"
+        },
+        "stableTagPointer": "https://api.github.com/repos/ollama/ollama/releases/latest",
+        "fallbackTagStrategy": "github-api-latest"
+      }
+    }
+  },
+  "versionProbe": { "type": "cli", "args": ["--version"], "regex": "ollama version is\\s+(\\S+)" },
+  "readyProbe": { "type": "http", "path": "/", "expect": 200 },
+  "defaultPort": 11434,
+  "defaultBind": "127.0.0.1",
+  "models": "ollama-registry"
+}

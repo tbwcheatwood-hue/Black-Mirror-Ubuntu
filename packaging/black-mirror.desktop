@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Black Mirror
+Comment=Local LLM studio — your machine, your models, your intelligence
+Exec=black-mirror
+Icon=black-mirror
+Terminal=false
+Type=Application
+Categories=Utility;
+StartupWMClass=black-mirror

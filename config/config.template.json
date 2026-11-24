@@ -1,0 +1,31 @@
+{
+  "_comment": "Black Mirror configuration template. The live config lives in %APPDATA%/BlackMirror/config.json and is created on first run. Copy values from here to pre-seed a machine. Fields not listed are defaults.",
+  "defaultEngineId": "llamacpp-cpu",
+  "network": {
+    "bind": "127.0.0.1",
+    "defaultPort": 8081
+  },
+  "params": {
+    "contextLength": 8192,
+    "threads": 6,
+    "gpuLayers": 0,
+    "batchSize": 512,
+    "parallelSlots": 1,
+    "temperature": 0.8,
+    "topP": 0.95,
+    "topK": 40,
+    "repeatPenalty": 1.1,
+    "maxTokens": 2048,
+    "kvCacheType": "f16",
+    "useMmap": true,
+    "flashAttention": false,
+    "thinkingMode": false
+  },
+  "chat": {
+    "stream": true,
+    "showThinking": true
+  },
+  "logging": {
+    "level": "info"
+  }
+}

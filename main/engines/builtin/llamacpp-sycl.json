@@ -1,0 +1,36 @@
+{
+  "id": "llamacpp-sycl",
+  "family": "llama.cpp",
+  "displayName": "llama.cpp (SYCL)",
+  "api": "openai",
+  "serverBinary": "llama-server",
+  "acceleration": "gpu-sycl",
+  "os": ["win32", "linux"],
+  "arch": ["x64"],
+  "capabilities": {
+    "thinking": "reasoning-format",
+    "images": false,
+    "embeddings": true,
+    "logitTimingLogs": true
+  },
+  "hardware": {
+    "requirements": ["Intel oneAPI Level Zero runtime / Intel graphics driver with Compute Runtime"],
+    "notes": "SYCL build for Intel GPUs (Level Zero). On Ubuntu the official asset is the FP32 Ubuntu tarball. The device must show up in sycl-ls or the binary's --list-devices. A display driver alone is not a SYCL runtime. FP16 builds are a separate engine (llamacpp-sycl-fp16) because they are not a drop-in for every Intel GPU."
+  },
+  "install": {
+    "type": "github-release-zip",
+    "repo": "ggml-org/llama.cpp",
+    "assetTemplate": "llama-{tag}-bin-win-sycl-x64.zip",
+    "assets": {
+      "linux-x64": "llama-{tag}-bin-ubuntu-sycl-fp32-x64.tar.gz",
+      "win32-x64": "llama-{tag}-bin-win-sycl-x64.zip"
+    },
+    "stableTagPointer": "https://github.com/ggml-org/llama.cpp/releases/download/v1.0.0/nightly-tag.txt",
+    "fallbackTagStrategy": "latest-b-release"
+  },
+  "versionProbe": { "type": "cli", "args": ["--version"], "regex": "version:\\s*(\\d+)\\s*\\((\\w+)\\)" },
+  "readyProbe": { "type": "http", "path": "/health", "expect": 200 },
+  "defaultPort": 8083,
+  "defaultBind": "127.0.0.1",
+  "models": "gguf-path"
+}

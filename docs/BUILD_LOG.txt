@@ -1,0 +1,30 @@
+# Windows packaging — build log (v1.2.0)
+
+Environment: isolated Linux sandbox (no wine, no Windows), Node 24.22.3,
+electron-builder 26.18.0, Electron 45.4.1. Build via the COMMITTED manifest
+(`npm run build:win` = `electron-builder --win dir zip --x64`) with the
+explicit `build` config in package.json (files whitelist, appId, targets).
+
+## Reproducibility chain
+1. `npm ci` restores the exact toolchain from package-lock.json (verified in
+   this session after the manifest correction).
+2. `npm run vendor` rebuilds renderer/vendor bundles (marked 18.3.0 via ESM
+   entry, highlight.js 11.12.0).
+3. `npm run build:win` — electron-builder dir + zip targets for x64.
+4. `npm run dist:verify` — automated inspection:
+   - `Black Mirror.exe` present, MZ/PE header
+   - `resources/app.asar` contains v1.2.0 markers:
+     /main/engines/capabilities.js, /main/compatlab/lab.js, /main/profiles.js,
+     /main/diagnostics.js, re-vendored renderer bundles, icon
+   - packaged manifest reports version 1.2.0
+   - production manifest correctly pruned (no scripts/devDependencies)
+
+## Not buildable here
+`build:portable` (single-exe portable) and NSIS require wine on Linux — not
+installable in this sandbox. On Windows: `npm install && npm run build:portable`
+or use the shipped `windows-portable/Black-Mirror-Portable-1.2.0.zip` (the
+zip of win-unpacked — self-contained portable folder build).
+
+## Detailed log
+See the tail of the build output in the release REFINEMENT/PRODUCTION_READINESS
+docs. Any signing warnings are expected (no code-signing certificate).

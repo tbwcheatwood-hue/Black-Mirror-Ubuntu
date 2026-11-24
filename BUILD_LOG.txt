@@ -1,0 +1,64 @@
+Black Mirror Ubuntu edition 1.0.0 — build log
+Date: 2026-11-24
+Host: Linux x86_64, Node.js 22, no display, no libgtk-3.so.0
+Tool: electron-builder 26.18.0, Electron 45.4.1
+
+1. npm ci --no-audit --no-fund
+   Result: 287 packages added. The electron npm package did not download its
+   binary during npm ci (install scripts are not run by default in this
+   environment).
+
+2. node node_modules/electron/install.js
+   Result: node_modules/electron/dist/electron, 224 MB.
+
+3. First electron-builder attempt
+   Command: npx electron-builder --linux deb AppImage tar.gz --x64
+   Result: FAILED before packaging.
+   Cause: linux.desktop was an object of Name/Comment/Categories. electron-builder
+   26 expects LinuxDesktopFile.entry, and a string path is also rejected.
+   Fix: removed the desktop override. The user-level desktop file remains
+   packaging/black-mirror.desktop and is written by scripts/install-ubuntu.sh.
+
+4. Second attempt (same command)
+   Result: PARTIAL.
+   - dist/linux-unpacked produced
+   - dist/Black Mirror-1.2.2.AppImage produced (ELF, 122 MB)
+   - dist/black-mirror-1.2.2.tar.gz produced (116 MB), top entry black-mirror-1.2.2/black-mirror
+   - deb FAILED: "Please specify project homepage"
+   Warning (non-fatal): desktopName was not set at the moment this process
+   read package.json.
+
+5. package.json
+   Added homepage https://github.com/kayock/Black-Mirror
+   Added desktopName black-mirror.desktop and linux.syncDesktopName true
+   so a later build associates the window with the desktop entry.
+
+6. Third attempt
+   Command: npx electron-builder --linux deb --x64
+   Result: SUCCESS. dist/black-mirror_1.2.2_amd64.deb (98 MB).
+   dpkg-deb -I:
+     Package: black-mirror
+     Version: 1.2.2
+     Architecture: amd64
+     Maintainer: Black Mirror Project
+     Homepage: https://github.com/kayock/Black-Mirror
+     Depends: libgtk-3-0, libnotify4, libnss3, libxss1, libxtst6, xdg-utils,
+               libatspi2.0-0, libuuid1, libsecret-1-0
+   Payload includes /opt/Black Mirror/ and resources/app.asar.
+
+7. Launch check
+   The Electron binary and the packaged app were NOT executed. The dynamic
+   linker reports libgtk-3.so.0 missing, and there is no X display. This is
+   recorded as not verified, not as a pass. See TEST_REPORT.md.
+
+8. Unit tests after the packaging run
+   node --test --test-timeout=60000 tests/*.test.js
+   tests 155, pass 153, fail 0, skipped 2, 19.5 s.
+
+Artifacts kept for the distribution archive:
+  dist/black-mirror_1.2.2_amd64.deb
+  dist/Black Mirror-1.2.2.AppImage
+  dist/black-mirror-1.2.2.tar.gz
+linux-unpacked is an intermediate directory (same tree as the tar.gz) and is
+not included in the ZIP. scripts/install-ubuntu.sh installs from that tar.gz
+when linux-unpacked is absent. No model weights and no node_modules are packed.

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' http://127.0.0.1:* http://localhost:*; script-src 'self'" />
+  <title>Black Mirror — Local AI Studio</title>
+  <link rel="stylesheet" href="styles/app.css" />
+  <link rel="stylesheet" href="vendor/hljs-github-dark.css" />
+  <link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="brand">
+        <img src="assets/logo-mark.svg" alt="Black Mirror logo" class="brand-mark" draggable="false" />
+        <div class="brand-text">
+          <div class="brand-name">BLACK MIRROR</div>
+          <div class="brand-sub">ubuntu edition</div>
+        </div>
+      </div>
+      <nav id="nav">
+        <button class="nav-item active" data-view="chat"><span class="nav-ico">◈</span> Chat</button>
+        <button class="nav-item" data-view="library"><span class="nav-ico">▦</span> Model Library</button>
+        <button class="nav-item" data-view="engines"><span class="nav-ico">⬡</span> Inference Engines</button>
+        <button class="nav-item" data-view="servers"><span class="nav-ico">⏻</span> Servers</button>
+        <button class="nav-item" data-view="compatlab"><span class="nav-ico">◈</span> Compat Lab</button>
+        <button class="nav-item" data-view="diagnostics"><span class="nav-ico">◔</span> Diagnostics</button>
+        <button class="nav-item" data-view="performance"><span class="nav-ico">▤</span> Performance</button>
+        <button class="nav-item" data-view="benchmarks"><span class="nav-ico">▲</span> Benchmarks</button>
+        <button class="nav-item" data-view="settings"><span class="nav-ico">⚙</span> Settings</button>
+      </nav>
+      <div class="sidebar-foot">
+        <div id="api-endpoint-chip" class="chip mono" title="Current API endpoint">—</div>
+        <div class="brand-version mono">v1.2.2</div>
+      </div>
+    </aside>
+
+    <main id="main">
+      <div id="preview-banner" class="preview-banner hidden">
+        PREVIEW MODE — the Electron bridge was not detected; UI is running on simulated data for interface preview.
+      </div>
+
+      <!-- ============ CHAT ============ -->
+      <section class="view active" id="view-chat">
+        <div class="chat-layout">
+          <div class="chat-col">
+            <header class="chat-header glass">
+              <div class="chat-title-row">
+                <button id="btn-new-chat" class="btn btn-ghost" title="New conversation">＋ New</button>
+                <div class="chat-model-picker">
+                  <select id="chat-model-select" title="Model served by the current server"></select>
+                </div>
+                <div id="chat-server-badge" class="badge badge-off">no server</div>
+                <div class="spacer"></div>
+                <div id="chat-stats" class="chat-stats mono"></div>
+              </div>
+            </header>
+            <div id="chat-messages" class="chat-messages" tabindex="0"></div>
+            <div id="chat-thinking" class="thinking-panel glass hidden">
+              <div class="thinking-head">◈ thinking <button id="thinking-toggle" class="link">hide</button></div>
+              <div id="thinking-content" class="thinking-content mono"></div>
+            </div>
+            <footer class="composer glass">
+              <div id="composer-warn" class="composer-warn hidden"></div>
+              <div class="composer-row">
+                <button id="btn-attach" class="btn btn-ghost" title="Attach text or image">📎</button>
+                <input id="attach-input" type="file" multiple class="hidden" accept=".txt,.md,.json,.csv,.py,.js,.ts,.log,.xml,.yaml,.yml,image/*" />
+                <textarea id="composer-input" rows="1" placeholder="Speak into the mirror…  (Enter to send, Shift+Enter for newline)"></textarea>
+                <button id="btn-send" class="btn btn-primary">Send</button>
+                <button id="btn-stop" class="btn btn-danger hidden">■ Stop</button>
+              </div>
+              <div id="attachments-preview" class="attachments-preview"></div>
+            </footer>
+          </div>
+          <aside class="chat-side glass">
+            <div class="side-head">
+              <input id="chat-search" type="search" placeholder="Search conversations…" />
+              <button id="btn-new-chat-2" class="btn btn-ghost" title="New conversation">＋</button>
+            </div>
+            <div id="conversation-list" class="conversation-list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============ MODEL LIBRARY ============ -->
+      <section class="view" id="view-library">
+        <header class="view-header">
+          <h2>Model Library</h2>
+          <div class="spacer"></div>
+          <button id="btn-add-scan-dir" class="btn btn-ghost">＋ Add scan directory</button>
+          <button id="btn-import-gguf" class="btn btn-ghost">⤵ Import GGUF (no copy)</button>
+          <button id="btn-refresh-library" class="btn btn-primary">⟳ Refresh</button>
+        </header>
+        <div class="library-toolbar">
+          <input id="lib-search" type="search" placeholder="Filter by name / architecture…" />
+          <select id="lib-arch"><option value="">All architectures</option></select>
+          <select id="lib-cat"><option value="">All categories</option></select>
+          <label class="check"><input type="checkbox" id="lib-fav" /> Favorites only</label>
+          <div id="lib-summary" class="mono dim"></div>
+        </div>
+        <div id="library-grid" class="library-grid"></div>
+        <div id="scan-dirs" class="scan-dirs"></div>
+      </section>
+
+      <!-- ============ ENGINES ============ -->
+      <section class="view" id="view-engines">
+        <header class="view-header">
+          <h2>Inference Engines</h2>
+          <div class="spacer"></div>
+          <div id="hw-summary" class="mono dim"></div>
+        </header>
+        <div id="engines-grid" class="engines-grid"></div>
+        <div class="panel glass">
+          <h3>Hardware compatibility</h3>
+          <div id="hw-details" class="hw-details"></div>
+        </div>
+      </section>
+
+      <!-- ============ SERVERS ============ -->
+      <section class="view" id="view-servers">
+        <header class="view-header">
+          <h2>Servers</h2>
+          <div class="spacer"></div>
+          <button id="btn-connect-remote" class="btn btn-ghost">⇄ Connect to endpoint</button>
+          <button id="btn-new-server" class="btn btn-primary">＋ Launch model server</button>
+        </header>
+        <div id="servers-grid" class="servers-grid"></div>
+        <div class="panel glass">
+          <h3>Externally running inference processes <span class="dim small">(read-only — Black Mirror never terminates processes it did not start)</span></h3>
+          <div id="external-procs" class="external-procs"></div>
+        </div>
+        <div class="panel glass grow">
+          <h3>Live log — <span id="log-server-title" class="mono">select a server</span></h3>
+          <pre id="server-log" class="server-log mono" tabindex="0"></pre>
+        </div>
+      </section>
+
+      <!-- ============ PERFORMANCE ============ -->
+      <section class="view" id="view-performance">
+        <header class="view-header">
+          <h2>Performance</h2>
+          <div class="spacer"></div>
+          <div id="perf-uptime" class="mono dim"></div>
+        </header>
+        <div class="perf-grid" id="perf-cards"></div>
+        <div class="perf-charts">
+          <div class="panel glass"><h3>CPU %</h3><canvas id="chart-cpu" width="560" height="120"></canvas></div>
+          <div class="panel glass"><h3>Memory used %</h3><canvas id="chart-mem" width="560" height="120"></canvas></div>
+        </div>
+        <div class="panel glass">
+          <h3>Managed inference processes</h3>
+          <div id="perf-processes"></div>
+        </div>
+        <div class="panel glass">
+          <h3>Pre-load resource assessment</h3>
+          <div id="preload-assess" class="preload-assess"></div>
+        </div>
+      </section>
+
+      <!-- ============ BENCHMARKS ============ -->
+      <section class="view" id="view-benchmarks">
+        <header class="view-header">
+          <h2>Benchmark Laboratory</h2>
+          <div class="spacer"></div>
+        </header>
+        <div class="bench-layout">
+          <div class="panel glass bench-config">
+            <h3>Run configuration</h3>
+            <div id="bench-form"></div>
+            <button id="btn-run-bench" class="btn btn-primary">▶ Run benchmark</button>
+            <div id="bench-progress" class="bench-progress mono dim"></div>
+            <p class="dim small">Measurements are taken from real requests against the selected engine and from server-reported timings. Nothing is simulated. Results are saved locally for comparison.</p>
+          </div>
+          <div class="panel glass bench-results">
+            <h3>Saved results</h3>
+            <div id="bench-results"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ COMPATIBILITY LAB ============ -->
+      <section class="view" id="view-compatlab">
+        <header class="view-header">
+          <h2>Compatibility Lab</h2>
+          <div class="spacer"></div>
+          <button id="lab-export-results" class="btn btn-ghost btn-sm">⤓ Export results</button>
+        </header>
+        <p class="dim small" style="margin-top:-6px">Does this model work on this engine, this hardware and this launch profile? Inspection uses confirmed metadata and probed capabilities; the staged test is manual and runs a small real load — nothing starts automatically.</p>
+        <div class="lab-grid">
+          <div class="panel glass">
+            <h3 style="margin:0 0 8px">Model inspection</h3>
+            <select id="lab-model" aria-label="Model to inspect"></select>
+            <div id="lab-model-inspect" style="margin-top:8px"></div>
+          </div>
+          <div class="panel glass">
+            <h3 style="margin:0 0 8px">Engine inspection</h3>
+            <select id="lab-engine" aria-label="Engine to inspect"></select>
+            <div id="lab-engine-inspect" style="margin-top:8px"></div>
+            <button id="lab-check-update" class="btn btn-ghost btn-sm" style="margin-top:8px">⇅ Check for newer release</button>
+          </div>
+        </div>
+        <div class="panel glass" style="margin-top:10px">
+          <h3 style="margin:0 0 8px">Compatibility assessment</h3>
+          <div class="lab-grid">
+            <label><span>Acceleration</span><select id="lab-accel"></select></label>
+            <label><span>Context length</span><input id="lab-ctx" type="number" value="8192" min="512"></label>
+            <label><span>KV cache</span><select id="lab-kv"><option>f16</option><option>q8_0</option><option>q4_0</option></select></label>
+            <label><span>Flash attention</span><input id="lab-fa" type="checkbox"></label>
+            <label><span>CPU expert offload</span><input id="lab-moe" type="number" value="0" min="0" max="999"></label>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+            <button id="lab-assess" class="btn btn-ghost btn-sm">🔍 Assess compatibility</button>
+            <button id="lab-run-test" class="btn btn-primary btn-sm">▶ Run staged compatibility test</button>
+          </div>
+          <div id="lab-assessment" style="margin-top:10px"></div>
+          <div id="lab-test-progress" class="small mono" style="margin-top:8px;max-height:180px;overflow:auto"></div>
+        </div>
+        <div class="panel glass" style="margin-top:10px">
+          <h3 style="margin:0 0 8px">Saved compatibility results</h3>
+          <div id="lab-results"></div>
+        </div>
+      </section>
+
+      <!-- ============ DIAGNOSTICS ============ -->
+      <section class="view" id="view-diagnostics">
+        <header class="view-header">
+          <h2>Diagnostics</h2>
+          <div class="spacer"></div>
+          <button id="diag-refresh" class="btn btn-ghost btn-sm">⟳ Refresh</button>
+          <button id="diag-export" class="btn btn-primary btn-sm">⤓ Export report</button>
+        </header>
+        <p class="dim small" style="margin-top:-6px">Local snapshot of application, hardware, engines, processes and recent errors — with plain-language troubleshooting hints. Exports write a file to this machine only; nothing is transmitted.</p>
+        <div id="diag-body"></div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section class="view" id="view-settings">
+        <header class="view-header"><h2>Settings</h2></header>
+        <div class="settings-layout">
+          <div class="panel glass">
+            <h3>Network & API</h3>
+            <div id="settings-network"></div>
+            <p class="dim small">Bind 127.0.0.1 keeps the API private to this machine. Bind 0.0.0.0 exposes the API to your local network — any device that can reach this computer could use your models. There is no authentication by design; change the bind only on trusted networks.</p>
+          </div>
+          <div class="panel glass">
+            <h3>Default inference parameters</h3>
+            <div id="settings-params"></div>
+          </div>
+          <div class="panel glass">
+            <h3>Chat</h3>
+            <div id="settings-chat"></div>
+          </div>
+          <div class="panel glass">
+            <h3>Diagnostics</h3>
+            <div id="settings-diag"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toasts"></div>
+  <div id="modal-root" class="modal-root hidden"></div>
+
+  <script src="vendor/marked.min.js"></script>
+  <script src="vendor/highlight.min.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/streamclient.js"></script>
+  <script src="js/bridge.js"></script>
+  <script src="js/markdown.js"></script>
+  <script src="js/views/chat.js"></script>
+  <script src="js/views/library.js"></script>
+  <script src="js/views/engines.js"></script>
+  <script src="js/views/servers.js"></script>
+  <script src="js/views/performance.js"></script>
+  <script src="js/views/benchmarks.js"></script>
+  <script src="js/views/compatlab.js"></script>
+  <script src="js/views/diagnostics.js"></script>
+  <script src="js/views/settings.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

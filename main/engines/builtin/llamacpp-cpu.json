@@ -1,0 +1,39 @@
+{
+  "id": "llamacpp-cpu",
+  "family": "llama.cpp",
+  "displayName": "llama.cpp (CPU)",
+  "api": "openai",
+  "serverBinary": "llama-server",
+  "acceleration": "cpu",
+  "os": ["win32", "linux"],
+  "arch": ["x64", "arm64"],
+  "capabilities": {
+    "thinking": "reasoning-format",
+    "images": false,
+    "embeddings": true,
+    "logitTimingLogs": true
+  },
+  "hardware": {
+    "requirements": [],
+    "notes": "Pure CPU inference. Works on x64/arm64 without a GPU. On Ubuntu this is the safe default. Windows builds stay on the win-cpu asset; Linux builds use the official Ubuntu CPU tarball."
+  },
+  "install": {
+    "type": "github-release-zip",
+    "repo": "ggml-org/llama.cpp",
+    "assetTemplate": "llama-{tag}-bin-win-cpu-x64.zip",
+    "assetTemplateArm64": "llama-{tag}-bin-win-cpu-arm64.zip",
+    "assets": {
+      "linux-x64": "llama-{tag}-bin-ubuntu-x64.tar.gz",
+      "linux-arm64": "llama-{tag}-bin-ubuntu-arm64.tar.gz",
+      "win32-x64": "llama-{tag}-bin-win-cpu-x64.zip",
+      "win32-arm64": "llama-{tag}-bin-win-cpu-arm64.zip"
+    },
+    "stableTagPointer": "https://github.com/ggml-org/llama.cpp/releases/download/v1.0.0/nightly-tag.txt",
+    "fallbackTagStrategy": "latest-b-release"
+  },
+  "versionProbe": { "type": "cli", "args": ["--version"], "regex": "version:\\s*(\\d+)\\s*\\((\\w+)\\)" },
+  "readyProbe": { "type": "http", "path": "/health", "expect": 200 },
+  "defaultPort": 8081,
+  "defaultBind": "127.0.0.1",
+  "models": "gguf-path"
+}
