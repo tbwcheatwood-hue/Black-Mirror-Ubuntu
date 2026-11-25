@@ -162,6 +162,54 @@ function parseCudaVersion(text) {
   return m ? m[1] : null;
 }
 
+// Older nvidia-smi builds reject the compute_cap field and exit non-zero for
+// the whole query. Retry without it and report the capability as unknown.
+// Each call is synchronous, and on some hosts takes several seconds, so a
+// slow round of calls is remembered and reused instead of repeated.
+const NVIDIA_SLOW_MS = 1000;
+// The cached round holds GPU identity, driver and CUDA version. None of
+// those change while the app is open, so the reuse window is long.
+const NVIDIA_SLOW_CACHE_MS = 30 * 60 * 1000;
+const nvidiaCache = { at: 0, slow: false, elapsedMs: null, capRejected: false, result: null };
+
+function probeNvidia(smi, run) {
+  if (nvidiaCache.slow && nvidiaCache.result && Date.now() - nvidiaCache.at < NVIDIA_SLOW_CACHE_MS) {
+    return nvidiaCache.result;
+  }
+  let elapsed = 0;
+  const timed = (args) => {
+    const startedAt = Date.now();
+    const r = run(smi, args, 5000);
+    elapsed += Date.now() - startedAt;
+    return r;
+  };
+  const ok = r => !!r && r.status === 0 && r.stdout.trim();
+  const FULL = ['--query-gpu=name,memory.total,driver_version,compute_cap', '--format=csv,noheader'];
+  const PLAIN = ['--query-gpu=name,memory.total,driver_version', '--format=csv,noheader'];
+  let query = nvidiaCache.capRejected ? null : timed(FULL);
+  let capMissing = false;
+  if (!ok(query)) {
+    const plain = timed(PLAIN);
+    if (ok(plain)) {
+      query = plain;
+      capMissing = true;
+      nvidiaCache.capRejected = true;
+    }
+  }
+  // The header is only read for the CUDA version, so skip it when no device answered.
+  const header = ok(query) ? timed([]) : { stdout: '', stderr: '' };
+  const result = { query, ok: ok(query), header: header.stdout + header.stderr, capMissing };
+  if (elapsed > NVIDIA_SLOW_MS) {
+    Object.assign(nvidiaCache, { at: Date.now(), slow: true, elapsedMs: elapsed, result });
+  }
+  return result;
+}
+
+/** True once a round of nvidia-smi calls on this host exceeded NVIDIA_SLOW_MS. */
+function nvidiaProbeInfo() {
+  return { slow: nvidiaCache.slow, elapsedMs: nvidiaCache.elapsedMs };
+}
+
 /**
  * @param {object} [opts] injectable readers for tests
  * @param {boolean} [opts.deep] when true, run vulkaninfo/rocminfo/sycl-ls if present
@@ -211,11 +259,10 @@ function probeHardware(opts = {}) {
   let nvidiaDriver = null;
   const smi = findExecutable('nvidia-smi');
   if (smi && !opts.skipNvidia) {
-    const q = run(smi, ['--query-gpu=name,memory.total,driver_version,compute_cap', '--format=csv,noheader'], 5000);
-    const header = run(smi, [], 5000);
-    if (q.status === 0 && q.stdout.trim()) {
-      const parsed = parseNvidiaSmi(q.stdout);
-      cudaVersion = parseCudaVersion(header.stdout + header.stderr);
+    const nv = probeNvidia(smi, run);
+    if (nv.ok) {
+      const parsed = parseNvidiaSmi(nv.query.stdout);
+      cudaVersion = parseCudaVersion(nv.header);
       nvidiaDriver = parsed[0] && parsed[0].driver;
       nvidiaRuntime = parsed;
       // Prefer nvidia-smi identity over a bare sysfs card when both exist.
@@ -226,6 +273,9 @@ function probeHardware(opts = {}) {
         } else if (!sysGpus.some(s => s.vendor === 'nvidia' && s.name === g.name && s.vramMB === g.vramMB)) {
           sysGpus.push(g);
         }
+      }
+      if (nv.capMissing) {
+        notes.push('This nvidia-smi does not report compute capability, so Kepler-class detection is unavailable. The CUDA builds here need compute capability 5.0 or newer; check the card against that before installing one.');
       }
     } else {
       notes.push('nvidia-smi is installed but did not return a device query. A GPU may be present without a working driver.');
@@ -328,5 +378,6 @@ module.exports = {
   parseMemInfo,
   parseNvidiaSmi,
   parseCudaVersion,
-  readSysGpus
+  readSysGpus,
+  nvidiaProbeInfo
 };

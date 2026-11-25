@@ -1,0 +1,38 @@
+{
+  "id": "lmstudio",
+  "family": "lmstudio",
+  "displayName": "LM Studio",
+  "api": "openai",
+  "serverBinary": "lms",
+  "lifecycle": "attach",
+  "acceleration": "engine-managed",
+  "os": [
+    "win32",
+    "linux"
+  ],
+  "arch": [
+    "x64",
+    "arm64"
+  ],
+  "capabilities": {
+    "images": true,
+    "embeddings": true,
+    "logitTimingLogs": false
+  },
+  "hardware": {
+    "requirements": [
+      "LM Studio installed, with its local server running"
+    ],
+    "notes": "Attach-only. LM Studio runs the server inside its own app and manages model loading and runtime settings itself; Black Mirror connects to it, lists its model library and chats through it. Start the server in LM Studio (Developer tab, Start Server) or run: lms server start. Nothing is installed and nothing in LM Studio is ever started, stopped, loaded or unloaded."
+  },
+  "versionProbe": {
+    "type": "cli",
+    "args": [
+      "version"
+    ],
+    "regex": "CLI commit:\\s*(\\w+)"
+  },
+  "defaultPort": 1234,
+  "defaultBind": "127.0.0.1",
+  "models": "lmstudio-registry"
+}

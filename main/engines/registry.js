@@ -203,7 +203,10 @@ class EngineRegistry {
       }
       const hwCategory = this._hardwareCategory(d, hardware, caps);
       let statusCategory;
-      if (error && !versions.length && !st.customPath) statusCategory = 'not-installed';
+      // Attach engines run their own server: there is nothing to install, and
+      // the CLI is optional (only its version display depends on it).
+      if (d.lifecycle === 'attach') { statusCategory = 'available'; error = null; }
+      else if (error && !versions.length && !st.customPath) statusCategory = 'not-installed';
       else if (error) statusCategory = 'error';
       else if (hwCategory === 'experimental') statusCategory = 'experimental';
       else if (hwCategory === 'compatible') statusCategory = 'compatible';
@@ -214,6 +217,7 @@ class EngineRegistry {
         displayName: d.displayName,
         acceleration: d.acceleration,
         modernCudaMinCC: d.modernCudaMinCC || null,
+        lifecycle: d.lifecycle || 'spawn', // 'attach': the engine runs its own server
         capabilities: d.capabilities,
         probedCapabilities: d.family === 'llama.cpp' ? require('./capabilities').summarize(d, caps) : null,
         probedHelpFlags: caps ? caps.helpFlags : null,
@@ -231,6 +235,9 @@ class EngineRegistry {
         settings: st.settings || {},
         status: error ? (versions.length ? 'error' : 'not-installed') : 'available',
         statusCategory,
+        statusNote: d.lifecycle === 'attach' ? (version
+          ? `Attach-only: ${d.displayName} runs its own server. Black Mirror connects to it and never starts, stops, loads or unloads anything there.`
+          : `Attach-only: ${d.displayName} runs its own server. Its "lms" command-line tool was not found, which only hides the version — set a custom executable path if it is installed elsewhere.`) : null,
         statusReason: this._statusReason(d, hwCategory, hardware)
       });
     }
@@ -253,6 +260,7 @@ class EngineRegistry {
     }
     if (d.acceleration === 'gpu-cuda') {
       if (hardware.legacyNvidia && d.modernCudaMinCC) return 'experimental';
+      if (hardware.nvidia && hardware.nvidia.gpus.some(g => g.computeMajor == null)) return 'experimental'; // capability unknown
       if (hardware.cuda === 'runtime-present') return 'compatible';
       return 'experimental';
     }
@@ -281,6 +289,9 @@ class EngineRegistry {
     if (d.acceleration === 'gpu-cuda' && hardware && hardware.legacyNvidia && d.modernCudaMinCC) {
       const devs = (hardware.legacyNvidiaDevices || []).map(g => `${g.name || 'NVIDIA GPU'} (cc ${g.computeCapability})`).join(', ');
       return `Modern CUDA ${d.modernCudaMinCC}+ builds do not support this GPU (${devs || 'compute capability below 5.0'}). Kepler-class cards such as Tesla K80 need an older CUDA 11-era llama.cpp binary registered as a custom executable path. Presence of the card is not a working acceleration claim.`;
+    }
+    if (hwCategory === 'experimental' && d.acceleration === 'gpu-cuda' && hardware && hardware.nvidia && hardware.nvidia.gpus.some(g => g.computeMajor == null)) {
+      return `The NVIDIA driver responded but does not report compute capability, so this app cannot tell whether these GPUs (${hardware.nvidia.gpus.map(g => g.name || 'NVIDIA GPU').join(', ')}) meet the CUDA ${d.modernCudaMinCC}+ requirement of this build. Check the card's capability before installing.`;
     }
     if (hwCategory === 'experimental') {
       return 'Acceleration runtime not confirmed on this machine — serve attempts may fail with a clear error. This is not a claim that GPU inference works.';

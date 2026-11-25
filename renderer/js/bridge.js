@@ -353,7 +353,7 @@ class HttpBridge {
     stop: (id) => this._rpc('servers:stop', [id]),
     restart: (id) => this._rpc('servers:restart', [id]),
     logs: (id) => this._rpc('servers:logs', [id]),
-    engineModels: (engineId) => this._rpc('servers:engineModels', [engineId]),
+    engineModels: (engineId, override) => this._rpc('servers:engineModels', [engineId, override]),
     addRemote: (opts) => this._rpc('servers:addRemote', [opts]),
     removeRemote: (id) => this._rpc('servers:removeRemote', [id]),
     testRemote: (idOrUrl) => this._rpc('servers:testRemote', [idOrUrl])

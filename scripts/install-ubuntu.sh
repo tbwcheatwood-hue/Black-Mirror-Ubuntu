@@ -24,7 +24,9 @@ elif ls "$ROOT"/dist/black-mirror-*.tar.gz >/dev/null 2>&1; then
   LAUNCH=$(find "$APP_DEST/portable" -maxdepth 3 -type f -name 'black-mirror' -perm -111 | head -n 1 || true)
 else
   # Source checkout: launcher runs Electron from this tree (Node 18+ required).
-  printf '%s\n' '#!/bin/sh' "cd $(printf '%q' "$ROOT")" 'exec npm start "$@"' > "$APP_DEST/black-mirror-src.sh"
+  # Single-quote the path for the generated /bin/sh script (printf %q is bash-only).
+  ROOT_Q=$(printf '%s' "$ROOT" | sed "s/'/'\\\\''/g")
+  printf '%s\n' '#!/bin/sh' "cd '$ROOT_Q'" 'exec npm start "$@"' > "$APP_DEST/black-mirror-src.sh"
   chmod 755 "$APP_DEST/black-mirror-src.sh"
   LAUNCH="$APP_DEST/black-mirror-src.sh"
 fi

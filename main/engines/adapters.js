@@ -361,10 +361,79 @@ class LemonadeAdapter {
   }
 }
 
+/**
+ * Family: LM Studio — the server runs inside LM Studio's own daemon, so its
+ * descriptor is lifecycle "attach" (see ServerController): Black Mirror
+ * connects to it and never spawns, loads or stops anything. Chat requests
+ * address models by the key LM Studio lists.
+ */
+class LmStudioAdapter {
+  constructor(descriptor, installed) {
+    this.d = descriptor;
+    this.installed = installed || {};
+  }
+
+  executablePath() {
+    const exe = this.d.serverBinary || 'lms';
+    if (this.installed.customPath) {
+      const p = findExecutable(this.installed.customPath);
+      if (p) return p;
+      throw new EngineError(`Configured executable not found: ${this.installed.customPath}`, 'binary-missing');
+    }
+    const onPath = findExecutable(exe);
+    if (onPath) return onPath;
+    throw new EngineError(`${this.d.displayName || 'LM Studio'} CLI ("${exe}") not found. Install it or set a custom executable path.`, 'binary-missing');
+  }
+
+  buildRequestOverrides(params) {
+    const p = params || {};
+    const out = {};
+    if (p.temperature !== undefined) out.temperature = p.temperature;
+    if (p.topP !== undefined) out.top_p = p.topP;
+    if (p.maxTokens !== undefined) out.max_tokens = p.maxTokens;
+    return out;
+  }
+
+  static parseVersionOutput(text, regexStr) {
+    const m = String(text || '').match(new RegExp(regexStr));
+    return m ? { build: m[1], commit: null, label: m[1] } : null;
+  }
+
+  /**
+   * Models in the engine's library that can answer chat requests, with their
+   * current load state (embedding models are left out). Also the reachability
+   * check: an unreachable server fails with guidance on how to start it.
+   */
+  async listModels(baseUrl, fetchImpl) {
+    let res;
+    try {
+      res = await (fetchImpl || fetch)(`${baseUrl}/api/v0/models`, { signal: AbortSignal.timeout(8000) });
+    } catch (e) {
+      throw new EngineError(
+        `LM Studio's local server is not reachable at ${baseUrl} (${e.message}). Start it in LM Studio (Developer → Start Server) or run "lms server start".`,
+        'unreachable');
+    }
+    if (!res.ok) throw new EngineError(`LM Studio API error ${res.status} at ${baseUrl}`, 'api');
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : (data.models || data.data || []);
+    return list
+      .filter(m => (m.type || 'llm') !== 'embeddings')
+      .map(m => ({
+        id: m.id || m.model || m.name,
+        displayName: m.id || m.model || m.name,
+        state: m.state || null,
+        quant: m.quantization || null,
+        architecture: m.arch || null,
+        parameterSize: null
+      }));
+  }
+}
+
 const FAMILY_CLASSES = {
   'llama.cpp': LlamaCppAdapter,
   'ollama': OllamaAdapter,
-  'lemonade': LemonadeAdapter
+  'lemonade': LemonadeAdapter,
+  'lmstudio': LmStudioAdapter
 };
 
 function createAdapter(descriptor, installed, capabilities) {
@@ -373,4 +442,4 @@ function createAdapter(descriptor, installed, capabilities) {
   return new Cls(descriptor, installed, capabilities);
 }
 
-module.exports = { PARAM_SCHEMA, EngineError, LlamaCppAdapter, OllamaAdapter, LemonadeAdapter, createAdapter, FAMILY_CLASSES };
+module.exports = { PARAM_SCHEMA, EngineError, LlamaCppAdapter, OllamaAdapter, LemonadeAdapter, LmStudioAdapter, createAdapter, FAMILY_CLASSES };

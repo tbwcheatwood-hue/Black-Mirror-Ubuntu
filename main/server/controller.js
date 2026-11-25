@@ -209,7 +209,7 @@ class ServerController {
       displayName,
       params: p.params || {},
       port: p.port, bind: p.bind, startedAt: p.startedAt,
-      status: p.status, mode: 'managed',
+      status: p.status, mode: p.mode || 'managed',
       family: p.family || null,
       pidRecovered: !!p.pidRecovered,
       exePath: p.exePath || null,
@@ -254,6 +254,10 @@ class ServerController {
     if (existing && ['starting', 'running', 'degraded'].includes(existing.status)) {
       throw new DuplicateProcessError(key, this._public(existing));
     }
+    // Engines that run their own server (LM Studio) are attached, not spawned:
+    // no port to claim (the engine already listens there), no process to own.
+    if (d.lifecycle === 'attach') return this._startAttached(d, adapter, { ...opts, model });
+
     // Another managed server may already use the same port with a different model.
     for (const p of this.processes.values()) {
       if (p.port === opts.port && ['starting', 'running', 'degraded'].includes(p.status)) {
@@ -360,6 +364,39 @@ class ServerController {
     return this._public(p);
   }
 
+  /**
+   * Attach to a server the engine runs itself (lifecycle "attach", e.g. LM
+   * Studio's daemon). Nothing is spawned, loaded or stopped: Black Mirror only
+   * records the endpoint and the model key chat requests are addressed to.
+   * Stopping such a server detaches; the engine's server keeps running.
+   */
+  async _startAttached(d, adapter, opts) {
+    if (!opts.model) throw new EngineError(`Choose a model from ${d.displayName}'s library first.`, 'unknown-model');
+    const base = `http://${opts.bind === '0.0.0.0' ? '127.0.0.1' : (opts.bind || '127.0.0.1')}:${opts.port}`;
+    // Reachability and model check both come from the engine's own library.
+    const entry = (await adapter.listModels(base, this.fetchImpl)).find(m => m.id === opts.model);
+    if (!entry) throw new EngineError(`Model "${opts.model}" is not in ${d.displayName}'s library.`, 'unknown-model');
+
+    const id = 'srv-' + (this._nextId++);
+    const p = {
+      id, engineId: opts.engineId, model: opts.model, modelPath: opts.model,
+      family: d.family,
+      displayName: opts.model, // the model key is the API identity
+      port: opts.port, bind: opts.bind || '127.0.0.1',
+      params: opts.params || {}, startedAt: Date.now(), pid: null,
+      proc: null, logs: [], status: 'running', mode: 'attached', logFile: null,
+      readyUrl: base + '/v1/models', adapter: d.api
+    };
+    this.processes.set(id, p);
+    this._appendLog(p, 'sys', `attached to ${d.displayName} at ${base} (model ${opts.model}) — the server is not owned by Black Mirror and is never stopped by it`);
+    if (entry.state && entry.state !== 'loaded') {
+      this._appendLog(p, 'sys', `model "${opts.model}" is not loaded yet — it loads on the first message when the engine's JIT loading is enabled, otherwise load it in ${d.displayName} first`);
+    }
+    this.logger.info('controller', `attached engine=${d.id} model=${opts.model} port=${opts.port} (engine-run server, never stopped)`);
+    this._emit('server-ready', { id, pid: null, port: p.port });
+    return this._public(p);
+  }
+
   async _waitReady(p) {
     const deadline = Date.now() + this.readyTimeoutMs;
     let lastErr = null;
@@ -403,6 +440,14 @@ class ServerController {
     const p = this._resolve(idOrKey);
     if (!p) throw new EngineError(`No managed server "${idOrKey}"`, 'not-found');
     if (p.mode === 'remote') throw new EngineError('Remote endpoints are never stopped by Black Mirror', 'not-owned');
+    if (p.mode === 'attached') {
+      // Nothing was spawned, so detaching is the whole stop. The engine's own
+      // server — and any model it has loaded — is left running.
+      this.processes.delete(p.id);
+      this._emit('server-exit', { id: p.id, pid: null, code: 0, signal: null, status: 'stopped' });
+      this.logger.info('controller', `detached from ${p.engineId} model=${p.model} (engine-run server left running)`);
+      return { id: p.id, pid: null, killed: false, detached: true, exitObserved: true, pidAliveAfter: false, portReleased: false, httpDown: false, confirmed: true };
+    }
 
     p.status = 'stopping';
     const pid = p.pid;
