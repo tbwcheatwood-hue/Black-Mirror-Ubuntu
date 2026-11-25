@@ -23,9 +23,11 @@ class Monitor {
     this.logger = logger;
     this.win = isWindows() ? new WinProbe(logger) : null;
     this.procFs = !isWindows();
-    this.nvidia = null; // { name, vramMB } when nvidia-smi works
+    this.nvidia = null; // { name, vramMB } when nvidia-smi works (Windows path only)
     this._prevCpu = null;
-    this._detectNvidia();
+    // Only the Windows branch of gpuSnapshot reads this.nvidia; on Linux the
+    // identity comes from linuxprobe, so do not block startup with a sync call.
+    if (isWindows()) this._detectNvidia();
     this.intervalMs = opts.intervalMs || 2000;
     this._timer = null;
     this.onSample = opts.onSample || (() => {});
@@ -140,14 +142,20 @@ class Monitor {
   gpuSnapshot() {
     if (!isWindows()) {
       try {
-        const { probeHardware } = require('./linuxprobe');
+        const { probeHardware, nvidiaProbeInfo: probeNvidiaInfo } = require('./linuxprobe');
         if (!this._linuxHw || Date.now() - (this._linuxHwAt || 0) > 8000) {
           this._linuxHw = probeHardware({ deep: false });
           this._linuxHwAt = Date.now();
         }
         const hw = this._linuxHw;
         const devices = hw.gpus || [];
-        if (hw.nvidia && findNvidiaSmi()) {
+        const telemetry = nvidiaTelemetryState();
+        // The identity probe above already timed nvidia-smi; a slow tool is not polled again.
+        if (probeNvidiaInfo().slow && !telemetry.disabled) {
+          nvidiaTelemetryState().disabled = true;
+          nvidiaTelemetryState().callMs = probeNvidiaInfo().elapsedMs;
+        }
+        if (hw.nvidia && !telemetry.disabled && findNvidiaSmi()) {
           const live = queryNvidiaLive();
           if (live) {
             return {
@@ -163,7 +171,9 @@ class Monitor {
           }
         }
         const named = devices.map(g => g.name || `${g.vendor || 'gpu'}${g.deviceId ? ' ' + g.deviceId : ''}`).filter(Boolean);
-        const note = named.length
+        const note = telemetry.disabled
+          ? `nvidia-smi answers too slowly on this host (about ${(telemetry.callMs / 1000).toFixed(1)} s), so live GPU utilization is not polled. Static GPU details are still reported.`
+          : named.length
           ? `GPU hardware is visible (${named.join('; ')}) but no telemetry probe returned numbers. Seeing a device is not the same as working acceleration.`
           : 'No GPU telemetry probe available on this system (nvidia-smi absent or it returned no device). Vulkan, ROCm and SYCL are not assumed.';
         return {
@@ -237,9 +247,33 @@ function findNvidiaSmi() {
   return findExecutable('nvidia-smi');
 }
 
+// nvidia-smi is called synchronously from the sample loop. On some hosts
+// (older Kepler-era drivers) a call takes several seconds, which would block
+// the main process for longer than the sample interval. After one call slower
+// than NVIDIA_LIVE_SLOW_MS, live telemetry is dropped and reported as absent.
+const NVIDIA_LIVE_SLOW_MS = 1000;
+const nvidiaTelemetry = { disabled: false, callMs: null };
+
+function nvidiaTelemetryState() {
+  return nvidiaTelemetry;
+}
+
+function resetNvidiaTelemetry() {
+  nvidiaTelemetry.disabled = false;
+  nvidiaTelemetry.callMs = null;
+}
+
 function queryNvidiaLive() {
   const { spawnSync } = require('child_process');
+  if (nvidiaTelemetry.disabled) return null;
+  const startedAt = Date.now();
   const r = spawnSync('nvidia-smi', ['--query-gpu=utilization.gpu,memory.used', '--format=csv,noheader,nounits'], { timeout: 4000, encoding: 'utf8', windowsHide: true });
+  const callMs = Date.now() - startedAt;
+  if (callMs > NVIDIA_LIVE_SLOW_MS || r.error) {
+    nvidiaTelemetry.disabled = true;
+    nvidiaTelemetry.callMs = callMs;
+    return null;
+  }
   if (r.status !== 0 || !r.stdout) return null;
   const line = r.stdout.trim().split('\n')[0];
   const [util, used] = line.split(',').map(s => parseInt(s.trim(), 10));
@@ -281,4 +315,4 @@ function readTopProcesses() {
   } catch (_) { return []; }
 }
 
-module.exports = { Monitor, readMemInfo, readPidRss, readTopProcesses };
+module.exports = { Monitor, readMemInfo, readPidRss, readTopProcesses, queryNvidiaLive, nvidiaTelemetryState, resetNvidiaTelemetry };

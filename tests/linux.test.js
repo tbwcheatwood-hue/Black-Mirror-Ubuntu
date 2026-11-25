@@ -66,6 +66,48 @@ describe('Linux hardware probe', () => {
     assert.equal(gpus[0].name, 'Tesla K80');
   });
 
+  test('retries nvidia-smi without compute_cap when the driver rejects that field', () => {
+    const calls = [];
+    const hw = probeHardware({
+      cpuinfo: CPUINFO,
+      meminfo: 'MemTotal: 8192 kB\nMemAvailable: 4096 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n',
+      deep: false,
+      noLscpu: true,
+      existsSync: () => false,
+      readdirSync: () => [],
+      readFileSync: () => { throw new Error('no sysfs'); },
+      run: (_cmd, args) => {
+        calls.push(args);
+        if (args.length === 0) return { status: 0, stdout: 'NVIDIA-SMI\nDriver Version: 470.256.02\nCUDA Version: 11.4\n', stderr: '' };
+        if (args[0].includes('compute_cap')) return { status: 2, stdout: '', stderr: 'Field "compute_cap" is not a valid field to query.' };
+        return { status: 0, stdout: 'Tesla K80, 11441 MiB, 470.256.02\n', stderr: '' };
+      }
+    });
+    assert.equal(hw.gpus.length, 1, 'the GPU is reported despite the rejected field');
+    assert.equal(hw.gpus[0].name, 'Tesla K80');
+    assert.equal(hw.gpus[0].computeCapability, null, 'capability is not invented');
+    assert.equal(hw.cuda, 'runtime-present');
+    assert.equal(hw.cudaVersion, '11.4');
+    assert.equal(calls.length, 3, 'full query, fallback query, then header');
+    assert.ok(hw.notes.some(n => /does not report compute capability/.test(n)));
+  });
+
+  test('skips the nvidia-smi header when no device answered', () => {
+    const calls = [];
+    const hw = probeHardware({
+      cpuinfo: CPUINFO,
+      meminfo: 'MemTotal: 8192 kB\nMemAvailable: 4096 kB\n',
+      noLscpu: true,
+      existsSync: () => false,
+      readdirSync: () => [],
+      readFileSync: () => { throw new Error('no sysfs'); },
+      run: (_cmd, args) => { calls.push(args.length === 0 ? 'header' : 'query'); return { status: 2, stdout: '', stderr: 'no device' }; }
+    });
+    assert.equal(hw.nvidia, null);
+    assert.ok(calls.length >= 1 && calls.length <= 2, 'query forms only');
+    assert.ok(!calls.includes('header'), 'no header call without a device');
+  });
+
   test('probe does not claim vulkan/rocm/sycl when those tools are not invoked', () => {
     const hw = probeHardware({
       cpuinfo: CPUINFO,
@@ -92,6 +134,53 @@ describe('Linux hardware probe', () => {
     assert.ok(Array.isArray(hw.gpus));
     for (const g of hw.gpus) {
       assert.ok(g.vendor, 'every reported gpu has a vendor from sysfs or nvidia-smi');
+    }
+  });
+});
+
+describe('Slow nvidia-smi telemetry guard', () => {
+  const { queryNvidiaLive, nvidiaTelemetryState, resetNvidiaTelemetry } = require('../main/monitor/monitor');
+
+  function fakeSmi(dir, body) {
+    const counter = path.join(dir, 'calls');
+    fs.writeFileSync(path.join(dir, 'nvidia-smi'), `#!/bin/sh\necho x >> ${counter}\n${body}\n`);
+    fs.chmodSync(path.join(dir, 'nvidia-smi'), 0o755);
+    return counter;
+  }
+
+  test('a call slower than the limit disables live telemetry and is not repeated', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bm-smislow-'));
+    const counter = fakeSmi(dir, 'sleep 1.3\necho "7, 100"');
+    const prevPath = process.env.PATH;
+    process.env.PATH = dir + path.delimiter + prevPath;
+    resetNvidiaTelemetry();
+    try {
+      assert.equal(queryNvidiaLive(), null);
+      const state = nvidiaTelemetryState();
+      assert.equal(state.disabled, true);
+      assert.ok(state.callMs > 1000, 'records how long the slow call took');
+      assert.equal(queryNvidiaLive(), null, 'returns immediately once disabled');
+      assert.equal(fs.readFileSync(counter, 'utf8').trim().split('\n').length, 1, 'nvidia-smi ran only once');
+    } finally {
+      if (prevPath === undefined) delete process.env.PATH; else process.env.PATH = prevPath;
+      resetNvidiaTelemetry();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('a fast call keeps telemetry available', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bm-smifast-'));
+    fakeSmi(dir, 'echo "7, 100"');
+    const prevPath = process.env.PATH;
+    process.env.PATH = dir + path.delimiter + prevPath;
+    resetNvidiaTelemetry();
+    try {
+      assert.deepEqual(queryNvidiaLive(), { utilizationPercent: 7, memoryUsedBytes: 100 * 1024 * 1024 });
+      assert.equal(nvidiaTelemetryState().disabled, false);
+    } finally {
+      if (prevPath === undefined) delete process.env.PATH; else process.env.PATH = prevPath;
+      resetNvidiaTelemetry();
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 });
