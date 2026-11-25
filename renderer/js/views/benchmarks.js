@@ -10,7 +10,8 @@ const BenchmarksView = (() => {
       window.Bridge.engines.status(),
       window.Bridge.library.list({ onlyValid: true })
     ]);
-    state.engines = engines.filter(e => e.status === 'available');
+    // Benchmarks need a server Black Mirror starts with a fixed test model, so attach engines are left out.
+    state.engines = engines.filter(e => e.status === 'available' && e.lifecycle !== 'attach');
     state.models = models;
     state.results = await window.Bridge.bench.results();
     renderForm();

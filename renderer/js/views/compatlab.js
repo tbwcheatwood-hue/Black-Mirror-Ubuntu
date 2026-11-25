@@ -47,7 +47,8 @@ const CompatLabView = (() => {
     }
     const es = $('lab-engine');
     es.innerHTML = '';
-    for (const e of state.engines) {
+    // The lab launches a GGUF through an engine binary; attach engines run their own server.
+    for (const e of state.engines.filter(x => x.lifecycle !== 'attach')) {
       es.appendChild(BMUtil.el('option', { value: e.id, text: `${e.displayName}${e.installed ? ' — ' + (e.version ? e.version.label : 'installed') : ' (not installed)'}` }));
     }
     const as = $('lab-accel');

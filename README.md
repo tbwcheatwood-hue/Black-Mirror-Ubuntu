@@ -65,6 +65,8 @@ User data lives in `$XDG_DATA_HOME/black-mirror` (usually `~/.local/share/black-
 
 Official assets are downloaded from GitHub on your request and extracted only under the data directory. See [ENGINE_COMPATIBILITY.md](ENGINE_COMPATIBILITY.md). A custom executable path is how you register an older CUDA 11 build for Kepler cards such as Tesla K80. Current CUDA 12/13 assets do not support those GPUs, and this app will not pretend they do.
 
+**LM Studio (attach-only):** LM Studio is listed as an engine but nothing is installed for it. It runs its own server, so start it in LM Studio (Developer tab, Start Server) or with `lms server start`, then pick LM Studio in the launch form, choose a model from its library and attach. Black Mirror never starts, stops, loads or unloads anything in LM Studio, and the launch parameters do not apply to it; "Detach" only forgets the endpoint. The other engines are unaffected.
+
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)

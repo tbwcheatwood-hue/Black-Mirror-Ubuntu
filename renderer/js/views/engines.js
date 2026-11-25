@@ -50,6 +50,7 @@ const EnginesView = (() => {
     if (e.version) c.appendChild(BMUtil.el('div', { class: 'small dim mono', text: `version: ${e.version.label}` }));
     if (e.error) c.appendChild(BMUtil.el('div', { class: 'model-err', text: '⚠ ' + e.error }));
     if (e.statusReason) c.appendChild(BMUtil.el('div', { class: 'engine-note', text: e.statusReason }));
+    if (e.statusNote) c.appendChild(BMUtil.el('div', { class: 'engine-note', text: e.statusNote }));
     // probed capabilities (from the binary itself where available)
     const pc = e.probedCapabilities;
     if (pc && pc.probed) {
@@ -91,7 +92,8 @@ const EnginesView = (() => {
     }
 
     const actions = BMUtil.el('div', { class: 'engine-actions' });
-    if (!e.installed) {
+    // Attach engines (LM Studio) run their own server — there is nothing to install.
+    if (!e.installed && e.lifecycle !== 'attach') {
       const installBtn = BMUtil.el('button', { class: 'btn btn-primary btn-sm', text: '⬇ Install' });
       installBtn.setAttribute('aria-label', `Install ${e.displayName}`);
       installBtn.addEventListener('click', async () => {

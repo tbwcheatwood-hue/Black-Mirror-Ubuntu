@@ -233,13 +233,13 @@ function registerIpc() {
   handle('servers:removeRemote', id => controller.removeRemote(id));
   handle('servers:testRemote', idOrUrl => controller.testRemote(idOrUrl));
   // Engine-registry model listing (Ollama / Lemonade manage their own models).
-  handle('servers:engineModels', async engineId => {
+  handle('servers:engineModels', async (engineId, override) => {
     const d = registry.descriptor(engineId);
     const st = (await registry.status()).find(s => s.id === engineId);
     if (!st || st.status !== 'available') throw new Error(`Engine ${engineId} is not available: ${st ? st.error : 'unknown'}`);
     const a = registry.adapter(engineId);
     if (!a.listModels) throw new Error(`Engine ${engineId} does not expose a model registry`);
-    const port = (st.settings && st.settings.port) || d.defaultPort;
+    const port = (override && override.port) || (st.settings && st.settings.port) || d.defaultPort;
     const bind = (st.settings && st.settings.bind) || d.defaultBind || '127.0.0.1';
     return a.listModels(`http://${bind === '0.0.0.0' ? '127.0.0.1' : bind}:${port}`, fetch);
   });

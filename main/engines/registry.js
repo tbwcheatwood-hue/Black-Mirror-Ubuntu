@@ -203,7 +203,10 @@ class EngineRegistry {
       }
       const hwCategory = this._hardwareCategory(d, hardware, caps);
       let statusCategory;
-      if (error && !versions.length && !st.customPath) statusCategory = 'not-installed';
+      // Attach engines run their own server: there is nothing to install, and
+      // the CLI is optional (only its version display depends on it).
+      if (d.lifecycle === 'attach') { statusCategory = 'available'; error = null; }
+      else if (error && !versions.length && !st.customPath) statusCategory = 'not-installed';
       else if (error) statusCategory = 'error';
       else if (hwCategory === 'experimental') statusCategory = 'experimental';
       else if (hwCategory === 'compatible') statusCategory = 'compatible';
@@ -214,6 +217,7 @@ class EngineRegistry {
         displayName: d.displayName,
         acceleration: d.acceleration,
         modernCudaMinCC: d.modernCudaMinCC || null,
+        lifecycle: d.lifecycle || 'spawn', // 'attach': the engine runs its own server
         capabilities: d.capabilities,
         probedCapabilities: d.family === 'llama.cpp' ? require('./capabilities').summarize(d, caps) : null,
         probedHelpFlags: caps ? caps.helpFlags : null,
@@ -231,6 +235,9 @@ class EngineRegistry {
         settings: st.settings || {},
         status: error ? (versions.length ? 'error' : 'not-installed') : 'available',
         statusCategory,
+        statusNote: d.lifecycle === 'attach' ? (version
+          ? `Attach-only: ${d.displayName} runs its own server. Black Mirror connects to it and never starts, stops, loads or unloads anything there.`
+          : `Attach-only: ${d.displayName} runs its own server. Its "lms" command-line tool was not found, which only hides the version — set a custom executable path if it is installed elsewhere.`) : null,
         statusReason: this._statusReason(d, hwCategory, hardware)
       });
     }

@@ -90,7 +90,7 @@ const ServersView = (() => {
       BMUtil.el('span', { class: badge, text: s.status }),
       BMUtil.el('span', { class: 'badge', text: `${s.engineId}` }),
       running ? BMUtil.el('span', { class: 'server-addr mono', text: s.baseUrl + '/v1', title: 'Copy API endpoint', onclick: () => { navigator.clipboard.writeText(s.baseUrl + '/v1'); toast('Endpoint copied', 'ok'); } }) : null,
-      s.startedAt ? BMUtil.el('span', { class: 'dim small', text: `up ${BMUtil.formatDuration((Date.now() - s.startedAt) / 1000)} · pid ${s.pid}` }) : null
+      s.startedAt ? BMUtil.el('span', { class: 'dim small', text: s.mode === 'attached' ? 'engine-run server · attached (never stopped by Black Mirror)' : `up ${BMUtil.formatDuration((Date.now() - s.startedAt) / 1000)} · pid ${s.pid}` }) : null
     ]);
     head.addEventListener('click', () => selectServer(s));
     c.appendChild(head);
@@ -115,6 +115,14 @@ const ServersView = (() => {
         await window.Bridge.servers.removeRemote(s.id);
         reload();
       });
+      c.appendChild(actions);
+      return c;
+    }
+    if (s.mode === 'attached') {
+      // Engine-run server (LM Studio): nothing was spawned, so there is no
+      // process to stop — detaching only forgets the endpoint here.
+      act('✕ Detach', async () => { try { await window.Bridge.servers.stop(s.id); reload(); toast('Detached — the engine keeps running', 'ok'); } catch (e) { toast(e.message, 'err'); } }, 'btn-danger', !running);
+      act('▤ Logs', () => selectServer(s));
       c.appendChild(actions);
       return c;
     }
@@ -180,14 +188,22 @@ const ServersView = (() => {
       const fillModels = async () => {
         modelSel.innerHTML = '';
         const eng = usable.find(e => e.id === engineSel.value);
-        if (eng && (eng.family === 'ollama' || eng.family === 'lemonade')) {
+        // Attach engines (LM Studio) run their own server: the port is where it
+        // already listens and the launch parameters do not apply.
+        const attach = !!(eng && eng.lifecycle === 'attach');
+        if (attach) portInput.value = (eng.settings && eng.settings.port) || eng.defaultPort || portInput.value;
+        paramsGrid.style.display = attach ? 'none' : '';
+        assessBox.style.display = attach ? 'none' : '';
+        attachNote.style.display = attach ? '' : 'none';
+        if (attach || eng.family === 'ollama' || eng.family === 'lemonade') {
           try {
-            const list = await window.Bridge.servers.engineModels(eng.id);
-            for (const m of (list || [])) modelSel.appendChild(BMUtil.el('option', { value: m.id, text: `${m.displayName || m.id}${m.parameterSize ? ' · ' + m.parameterSize : ''}${m.quant ? ' · ' + m.quant : ''}` }));
+            const list = await window.Bridge.servers.engineModels(eng.id, attach ? { port: Number(portInput.value) } : undefined);
+            for (const m of (list || [])) modelSel.appendChild(BMUtil.el('option', { value: m.id, text: `${m.displayName || m.id}${m.parameterSize ? ' · ' + m.parameterSize : ''}${m.quant ? ' · ' + m.quant : ''}${m.state === 'loaded' ? ' · loaded' : ''}` }));
           } catch (e) {
             modelSel.appendChild(BMUtil.el('option', { value: '__none__', text: `(service offline: ${e.message})` }));
           }
-          modelSel.appendChild(BMUtil.el('option', { value: '__none__', text: '(engine manages its own models)' }));
+          // Chat needs a model key from the engine's library, so attach engines get no "engine manages its own" fallback.
+          if (!attach) modelSel.appendChild(BMUtil.el('option', { value: '__none__', text: '(engine manages its own models)' }));
         } else {
           for (const m of models) {
             const splitTag = m.split ? ` · shard ${m.split.index}/${m.split.total}` : '';
@@ -266,6 +282,12 @@ const ServersView = (() => {
       form.appendChild(paramsGrid);
       form.appendChild(netGrid);
       form.appendChild(assessBox);
+      const attachNote = BMUtil.el('p', { class: 'dim small', style: 'display:none', text: 'This engine runs its own server and manages model loading and runtime settings itself — Black Mirror only attaches to it, so the launch parameters do not apply and nothing in the engine is started, stopped, loaded or unloaded.' });
+      form.appendChild(attachNote);
+      portInput.addEventListener('change', () => {
+        const eng = usable.find(e => e.id === engineSel.value);
+        if (eng && eng.lifecycle === 'attach') fillModels();
+      });
       await fillModels();
 
       const launch = BMUtil.el('button', { class: 'btn btn-primary', text: '▶ Launch server', onclick: async () => {
@@ -274,6 +296,9 @@ const ServersView = (() => {
           const v = inputs[f.id];
           params[f.id] = f.type === 'bool' ? v.checked : (f.type === 'int' || f.type === 'float' ? Number(v.value) : v.value);
         }
+        // Attach engines: the parameter controls are not shown for them, so
+        // the engine's own defaults apply instead of the hidden fields' values.
+        if ((usable.find(e => e.id === engineSel.value) || {}).lifecycle === 'attach') delete params.thinkingMode;
         try {
           const model = modelSel.value === '__none__' ? null : modelSel.value;
           const s = await window.Bridge.servers.start({

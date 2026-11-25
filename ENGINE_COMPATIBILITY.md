@@ -15,6 +15,7 @@ Asset names below were taken from ggml-org/llama.cpp tag **b12678** (24 Nov 2026
 | llamacpp-sycl-fp16 | `llama-{tag}-bin-ubuntu-sycl-fp16-x64.tar.gz` | `sycl-ls` and an Intel GPU that actually accepts FP16 | Experimental. Separate engine so it is not swapped in silently. |
 | ollama | `ollama-linux-amd64.tgz` from ollama/ollama | the unpacked `ollama` binary | Isolated. `OLLAMA_MODELS` points at the Black Mirror data dir for processes **this app** starts. |
 | lemonade | `lemonade-embeddable-{version}-ubuntu-x64.tar.gz` | the unpacked server | Isolated tarball. |
+| lmstudio | none — attach-only | LM Studio's own local server (port 1234 by default); the `lms` CLI is optional | Nothing is installed. Black Mirror connects to a server LM Studio already runs and never starts, stops, loads or unloads anything there. |
 
 arm64 templates exist for CPU, Vulkan, CUDA 13, Ollama and Lemonade where upstream publishes them.
 
